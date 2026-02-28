@@ -1,8 +1,11 @@
 import telebot
 from telebot import types
 from config.config import api_token
-from sklearn.preprocessing import StandardScaler
+
 from model_to_predict import predict_match
+from get_info.get_coeff import find_match_odds
+
+from sklearn.preprocessing import StandardScaler
 import joblib
 import os
 import numpy as np
@@ -102,7 +105,13 @@ def on_player_click(call):
         )
 
         try:
-            odds_a, odds_b = 2.0, 1.8
+            # тебе нужно эту функцию написать
+            odds_a, odds_b = find_match_odds(p1, p2)
+
+            if odds_a is None and odds_b is None:
+                odds_a = 2.0
+                odds_b = 1.8
+
             print("[LOG] Запуск predict_match...")
 
             prob_a = predict_match(p1, p2, odds_a, odds_b)
