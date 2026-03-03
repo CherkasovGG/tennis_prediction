@@ -1,9 +1,11 @@
+from collections import defaultdict
+
 import telebot
 from telebot import types
 from config.config import api_token
 
 from model_to_predict import predict_match
-from get_info.get_coeff import find_match_odds
+from get_info import find_match_odds
 
 from sklearn.preprocessing import StandardScaler
 import joblib
@@ -36,23 +38,34 @@ PLAYERS = [
 ]
 
 user_state = {}
+MATCH_ODDS = defaultdict(dict)
 
-def make_players_keyboard(exclude=None):
+def make_matches_keyboard():
     markup = types.InlineKeyboardMarkup()
-    exclude = exclude or []
-    row = []
-    for name in PLAYERS:
-        if name in exclude:
-            continue
-        btn = types.InlineKeyboardButton(text=name, callback_data=f"player:{name}")
-        row.append(btn)
-        if len(row) == 2:
-            markup.row(*row)
-            row = []
-    if row:
-        markup.row(*row)
+
+    for (p1, p2), odds in MATCH_ODDS.items():
+        odds_a, odds_b = odds
+
+        text = f"{p1} vs {p2} ({odds_a:.2f} / {odds_b:.2f})"
+
+        btn = types.InlineKeyboardButton(
+            text=text,
+            callback_data=f"match:{p1}|{p2}"
+        )
+
+        markup.add(btn)
+
     return markup
 
+def get_pair_odds(p1, p2):
+    if (p1, p2) in MATCH_ODDS:
+        return MATCH_ODDS[(p1, p2)]
+
+    if (p2, p1) in MATCH_ODDS:
+        odds = MATCH_ODDS[(p2, p1)]
+        return odds[1], odds[0]
+
+    return None, None
 
 @bot.message_handler(commands=["start", "help"])
 def send_welcome(message):
@@ -71,74 +84,46 @@ def choose_players_menu(message):
     bot.send_message(
         message.chat.id,
         "Выбери первого игрока:",
-        reply_markup=make_players_keyboard(),
+        reply_markup=make_matches_keyboard(),
     )
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("player:"))
-def on_player_click(call):
-    user_id = call.from_user.id
-    name = call.data.split(":", 1)[1]
-    state = user_state.get(user_id, {})
+@bot.callback_query_handler(func=lambda call: call.data.startswith("match:"))
+def on_match_click(call):
+    data = call.data.split(":", 1)[1]
+    p1, p2 = data.split("|")
 
-    if "p1" not in state:
-        state["p1"] = name
-        user_state[user_id] = state
+    bot.answer_callback_query(call.id, "Считаем прогноз...")
 
-        bot.answer_callback_query(call.id)
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text=f"Первый игрок: {name}\nТеперь выбери второго:",
-            reply_markup=make_players_keyboard(exclude=[name]),
-        )
-    else:
-        state["p2"] = name
-        user_state[user_id] = state
-        p1, p2 = state["p1"], state["p2"]
+    msg = bot.send_message(
+        call.message.chat.id,
+        f"{p1} vs {p2}\nЗапуск модели..."
+    )
 
-        bot.answer_callback_query(call.id, "Запрос принят, считаем прогноз...")
+    try:
+        odds_a, odds_b = get_pair_odds(p1, p2)
 
-        msg = bot.send_message(
-            call.message.chat.id,
-            f"Получена пара: {p1} vs {p2}\nНачинаем расчёт..."
-        )
+        if odds_a is None:
+            odds_a = 2.0
+        if odds_b is None:
+            odds_b = 1.8
 
-        try:
-            # тебе нужно эту функцию написать
-            odds_a, odds_b = find_match_odds(p1, p2)
+        prob_a = predict_match(p1, p2, odds_a, odds_b)
 
-            if odds_a is None and odds_b is None:
-                odds_a = 2.0
-                odds_b = 1.8
-
-            print("[LOG] Запуск predict_match...")
-
-            prob_a = predict_match(p1, p2, odds_a, odds_b)
-
-            print(f"[LOG] predict_match вернул: {prob_a:.4f}")
-
-            text = (
-                f"Пара: {p1} vs {p2}\n"
-                f"Модель: P({p1} выигрывает) = {prob_a:.3f}\n"
-                f"Кэфы: A={odds_a:.2f}, B={odds_b:.2f}"
-            )
-
-            print(text)
-        except Exception as e:
-            text = f"Ошибка при расчёте: {repr(e)}"
-            bot.send_message(
-                call.message.chat.id,
-                f"[LOG] Exception в predict_match: {repr(e)}"
-            )
-        print('BOT TEXT')
-        bot.edit_message_text(
-            chat_id=msg.chat.id,
-            message_id=msg.message_id,
-            text=text,
+        text = (
+            f"{p1} vs {p2}\n\n"
+            f"P({p1}) = {prob_a:.3f}\n"
+            f"Коэфы: {odds_a:.2f} / {odds_b:.2f}"
         )
 
-        user_state.pop(user_id, None)
+    except Exception as e:
+        text = f"Ошибка: {repr(e)}"
+
+    bot.edit_message_text(
+        chat_id=msg.chat.id,
+        message_id=msg.message_id,
+        text=text
+    )
 
 
 @bot.message_handler(content_types=["text"])
@@ -181,6 +166,6 @@ def get_players(message):
         )
 
 
-if __name__ == "main":
-    print("Bot started...")
+if __name__ == "__main__":
+    MATCH_ODDS = find_match_odds()
     bot.infinity_polling()
