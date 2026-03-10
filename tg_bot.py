@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+import time
+import threading
 import telebot
 from telebot import types
 from config.config import api_token
@@ -7,43 +9,52 @@ from config.config import api_token
 from model_to_predict import predict_match
 from get_info import find_match_odds
 
-from sklearn.preprocessing import StandardScaler
-import joblib
-import os
-import numpy as np
-import pandas as pd
-from catboost import CatBoostRegressor
-from sklearn.ensemble import RandomForestClassifier
-from tabpfn import TabPFNClassifier
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.preprocessing import StandardScaler, LabelEncoder, OrdinalEncoder
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix, classification_report
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-import matplotlib.pyplot as plt
-
 
 bot = telebot.TeleBot(api_token)
 
-PLAYERS = [
-    "Djokovic",
-    "Nadal",
-    "Federer",
-    "Alcaraz",
-    "Medvedev",
-    "Sinner",
-]
-
 user_state = {}
 MATCH_ODDS = defaultdict(dict)
+UPDATE_INTERVAL = 900
+FULL_REFRESH_INTERVAL = 43200
+MATCH_ODDS_LOCK = threading.Lock()
+
+def odds_updater():
+    global MATCH_ODDS
+
+    last_full_refresh = time.time()
+
+    while True:
+        try:
+            print("[SCRAPER] Обновление коэффициентов...")
+
+            new_data = find_match_odds()
+
+            with MATCH_ODDS_LOCK:
+
+                if time.time() - last_full_refresh > FULL_REFRESH_INTERVAL:
+                    print("[SCRAPER] Полный ресет коэффициентов")
+                    MATCH_ODDS.clear()
+                    MATCH_ODDS.update(new_data)
+                    last_full_refresh = time.time()
+
+                else:
+                    for match, odds in new_data.items():
+                        MATCH_ODDS[match] = odds
+
+                print(f"[SCRAPER] Матчей в базе: {len(MATCH_ODDS)}")
+
+        except Exception as e:
+            print("[SCRAPER ERROR]", e)
+
+        time.sleep(UPDATE_INTERVAL)
 
 def make_matches_keyboard():
     markup = types.InlineKeyboardMarkup()
 
-    for (p1, p2), odds in MATCH_ODDS.items():
+    with MATCH_ODDS_LOCK:
+        items = list(MATCH_ODDS.items())
+
+    for (p1, p2), odds in items:
         odds_a, odds_b = odds
 
         text = f"{p1} vs {p2} ({odds_a:.2f} / {odds_b:.2f})"
@@ -58,12 +69,13 @@ def make_matches_keyboard():
     return markup
 
 def get_pair_odds(p1, p2):
-    if (p1, p2) in MATCH_ODDS:
-        return MATCH_ODDS[(p1, p2)]
+    with MATCH_ODDS_LOCK:
+        if (p1, p2) in MATCH_ODDS:
+            return MATCH_ODDS[(p1, p2)]
 
-    if (p2, p1) in MATCH_ODDS:
-        odds = MATCH_ODDS[(p2, p1)]
-        return odds[1], odds[0]
+        if (p2, p1) in MATCH_ODDS:
+            odds = MATCH_ODDS[(p2, p1)]
+            return odds[1], odds[0]
 
     return None, None
 
@@ -167,5 +179,13 @@ def get_players(message):
 
 
 if __name__ == "__main__":
+
     MATCH_ODDS = find_match_odds()
+
+    updater_thread = threading.Thread(
+        target=odds_updater,
+        daemon=True
+    )
+    updater_thread.start()
+
     bot.infinity_polling()
