@@ -68,14 +68,17 @@ class OddsScraper:
             """)
             await page.goto(url, wait_until="domcontentloaded")
             await page.wait_for_timeout(6000)
+            max_scrolls = 20
+            scroll_count = 0
             last_height = 0
-            while True:
+            while scroll_count < max_scrolls:
                 height = await page.evaluate("document.body.scrollHeight")
                 if height == last_height:
                     break
                 last_height = height
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 await asyncio.sleep(1)
+                scroll_count += 1
             await page.wait_for_timeout(3000)
             rows = await page.query_selector_all("div[data-testid*='expanded-row']")
             odds_data = {}
