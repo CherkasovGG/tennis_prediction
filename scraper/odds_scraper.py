@@ -7,41 +7,46 @@ from config import base_url, odds_url
 
 class OddsScraper:
     def __init__(self):
-        pass
+        self.p = sync_playwright().start()
+        self.browser = self.p.chromium.launch(
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled"]
+        )
 
     def find_match_odds(self):
         match_odds = {}
-        try:
-            with sync_playwright() as p:
-                browser = p.chromium.launch(
-                    headless=True,
-                    args=["--disable-blink-features=AutomationControlled"]
-                )
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                               "AppleWebKit/537.36 (KHTML, like Gecko) "
-                               "Chrome/120.0.0.0 Safari/537.36",
-                    viewport={"width": 1920, "height": 1080},
-                    locale="en-US"
-                )
 
-                atp_match_groups_links = self._extract_links(context)
-                for group_link in atp_match_groups_links or []:
-                    print(group_link)
-                    matches = self._extract_links_from_ldjson(group_link, context)
-                    for names, link in matches or []:
-                        try:
-                            odds = self._get_odds(link, context)
-                            if odds:
-                                match_odds[names] = odds
-                                print(names, odds)
-                        except Exception as e:
-                            print(f"[ERROR get_odds] {names} - {e}")
+        context = self.browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                       "AppleWebKit/537.36 (KHTML, like Gecko) "
+                       "Chrome/120.0.0.0 Safari/537.36",
+            viewport={"width": 1920, "height": 1080},
+            locale="en-US"
+        )
+        try:
+            atp_match_groups_links = self._extract_links(context)
+            for group_link in atp_match_groups_links or []:
+                print(group_link)
+                matches = self._extract_links_from_ldjson(group_link, context)
+                for names, link in matches or []:
+                    try:
+                        odds = self._get_odds(link, context)
+                        if odds:
+                            match_odds[names] = odds
+                            print(names, odds)
+                    except Exception as e:
+                        print(f"[ERROR get_odds] {names} - {e}")
+            print('Odds finding ended')
         except Exception as e:
             print(f"[ERROR find_match_odds] {e}")
         finally:
-            browser.close()
+            if context:
+                context.close()
         return match_odds
+
+    def close(self):
+        self.browser.close()
+        self.p.stop()
 
     def _normalize_link(self, href: str) -> str:
         if not href:

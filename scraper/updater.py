@@ -15,6 +15,8 @@ class OddsUpdater:
                     print("SAVING TO REDIS:", p1, p2)
                     self.match_cache.save_match(p1, p2, odds_a, odds_b)
 
+                print("REDIS KEYS AFTER SAVE:", self.match_cache.redis.keys("*"))
+
             except Exception as e:
                 print(e)
 
