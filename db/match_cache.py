@@ -4,7 +4,7 @@ from config import redis_url
 
 class MatchCache:
     def __init__(self, ttl=43200):
-        self.redis = redis.from_url(redis_url)
+        self.redis = redis.from_url(redis_url, decode_responses=True)
         self.ttl = ttl
 
     def save_match(self, player_a: str, player_b: str, odds_a: float, odds_b: float):
