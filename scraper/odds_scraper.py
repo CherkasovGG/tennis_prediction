@@ -1,22 +1,31 @@
+import asyncio
 import json
 import html
-import time
 from urllib.parse import urljoin
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 from config import base_url, odds_url
 
 class OddsScraper:
     def __init__(self):
-        self.p = sync_playwright().start()
-        self.browser = self.p.chromium.launch(
+        self.playwright = None
+        self.browser = None
+
+    async def start(self):
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch(
             headless=True,
             args=["--disable-blink-features=AutomationControlled"]
         )
 
-    def find_match_odds(self):
+    async def close(self):
+        await self.browser.close()
+        await self.playwright.stop()
+
+
+    async def find_match_odds(self):
         match_odds = {}
 
-        context = self.browser.new_context(
+        context = await self.browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                        "AppleWebKit/537.36 (KHTML, like Gecko) "
                        "Chrome/120.0.0.0 Safari/537.36",
@@ -24,13 +33,13 @@ class OddsScraper:
             locale="en-US"
         )
         try:
-            atp_match_groups_links = self._extract_links(context)
+            atp_match_groups_links = await self._extract_links(context)
             for group_link in atp_match_groups_links or []:
                 print(group_link)
-                matches = self._extract_links_from_ldjson(group_link, context)
+                matches = await self._extract_links_from_ldjson(group_link, context)
                 for names, link in matches or []:
                     try:
-                        odds = self._get_odds(link, context)
+                        odds = await self._get_odds(link, context)
                         if odds:
                             match_odds[names] = odds
                             print(names, odds)
@@ -41,42 +50,38 @@ class OddsScraper:
             print(f"[ERROR find_match_odds] {e}")
         finally:
             if context:
-                context.close()
+                await context.close()
         return match_odds
-
-    def close(self):
-        self.browser.close()
-        self.p.stop()
 
     def _normalize_link(self, href: str) -> str:
         if not href:
             return None
         return urljoin(base_url, href)
 
-    def _get_odds(self, url, context):
-        page = context.new_page()
+    async def _get_odds(self, url, context):
+        page = await context.new_page()
         try:
-            page.add_init_script("""
+            await page.add_init_script("""
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
                 });
             """)
-            page.goto(url, wait_until="domcontentloaded")
-            page.wait_for_timeout(6000)
+            await page.goto(url, wait_until="domcontentloaded")
+            await page.wait_for_timeout(6000)
             last_height = 0
             while True:
-                height = page.evaluate("document.body.scrollHeight")
+                height = await page.evaluate("document.body.scrollHeight")
                 if height == last_height:
                     break
                 last_height = height
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                time.sleep(1)
-            page.wait_for_timeout(3000)
-            rows = page.query_selector_all("div[data-testid*='expanded-row']")
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(1)
+            await page.wait_for_timeout(3000)
+            rows = await page.query_selector_all("div[data-testid*='expanded-row']")
             odds_data = {}
             for row in rows:
                 try:
-                    text = row.inner_text()
+                    text = await row.inner_text()
                     lines = text.split("\n")
                     if len(lines) >= 3:
                         bookmaker = lines[0].strip()
@@ -98,19 +103,19 @@ class OddsScraper:
         except Exception as e:
             print(f"[ERROR get_odds] {e}")
         finally:
-            page.close()
+            await page.close()
         return None
 
-    def _extract_links_from_ldjson(self, url, context):
-        page = context.new_page()
+    async def _extract_links_from_ldjson(self, url, context):
+        page = await context.new_page()
         try:
-            page.goto(url, wait_until="domcontentloaded")
-            page.wait_for_timeout(3000)
+            await page.goto(url, wait_until="domcontentloaded")
+            await page.wait_for_timeout(3000)
             scripts = page.locator("script[type='application/ld+json']")
-            count = scripts.count()
+            count = await scripts.count()
             links = []
             for i in range(count):
-                content = scripts.nth(i).inner_text()
+                content = await scripts.nth(i).inner_text()
                 try:
                     data = json.loads(content)
                 except:
@@ -130,29 +135,29 @@ class OddsScraper:
             print(f"[ERROR extract_links_from_ldjson] {e}")
             return []
         finally:
-            page.close()
+            await page.close()
 
-    def _extract_links(self, context):
-        page = context.new_page()
+    async def _extract_links(self, context):
+        page = await context.new_page()
         try:
-            page.goto(odds_url, wait_until="domcontentloaded")
-            page.wait_for_timeout(5000)
+            await page.goto(odds_url, wait_until="domcontentloaded")
+            await page.wait_for_timeout(5000)
             selector = """#app > div.relative.flex.flex-col.w-full.max-w-\\[1350px\\].font-main > 
             div.w-full.flex-center.bg-gray-med_light > 
             div > main > 
             div.relative.w-full.flex-grow-1.min-w-\\[320px\\].bg-white-main > 
             div:nth-child(3)"""
             container = page.locator(selector)
-            if container.count() == 0:
+            if await container.count() == 0:
                 print("[ERROR extract_links] Блок не найден")
                 return []
             links = container.locator("a")
-            count = links.count()
+            count = await links.count()
             normalized_links = []
             for i in range(count):
-                text = links.nth(i).inner_text()
+                text = await links.nth(i).inner_text()
                 if 'atp' in text.lower() and 'women' not in text.lower() and 'doubles' not in text.lower():
-                    href = links.nth(i).get_attribute("href")
+                    href = await links.nth(i).get_attribute("href")
                     full_url = self._normalize_link(href)
                     normalized_links.append(full_url)
             return normalized_links
@@ -160,4 +165,4 @@ class OddsScraper:
             print(f"[ERROR extract_links] {e}")
             return []
         finally:
-            page.close()
+            await page.close()
