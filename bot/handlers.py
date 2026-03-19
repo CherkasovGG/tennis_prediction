@@ -1,5 +1,5 @@
 from model import predict_match
-from bot import make_matches_keyboard
+from .keyboard import make_matches_keyboard
 
 
 def register_handlers(telegram_bot, cache):
