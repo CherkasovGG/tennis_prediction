@@ -1,5 +1,5 @@
 import asyncio
-import telebot
+import telebot.async_telebot as telebot
 from db import MatchCache
 from config import api_token
 from scraper import OddsScraper
@@ -7,7 +7,7 @@ from scraper import OddsUpdater
 from bot import register_handlers
 
 async def main():
-    telegram_bot = telebot.TeleBot(api_token)
+    telegram_bot = telebot.AsyncTeleBot(api_token)
     cache = MatchCache()
     await cache.start()
     print(f"Redis is up: {await cache.ping()}")
@@ -20,8 +20,7 @@ async def main():
 
     register_handlers(telegram_bot, cache)
     print("Bot started")
-    loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, telegram_bot.infinity_polling)
+    await telegram_bot.infinity_polling()
 
 
 if __name__ == "__main__":
