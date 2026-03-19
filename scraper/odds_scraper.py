@@ -59,6 +59,7 @@ class OddsScraper:
         return urljoin(base_url, href)
 
     async def _get_odds(self, url, context):
+        print("Started getting odds for", url)
         page = await context.new_page()
         try:
             await page.add_init_script("""
@@ -72,6 +73,7 @@ class OddsScraper:
             scroll_count = 0
             last_height = 0
             while scroll_count < max_scrolls:
+                print(f"Scroll {scroll_count} / {max_scrolls} for {url}")
                 height = await page.evaluate("document.body.scrollHeight")
                 if height == last_height:
                     break
