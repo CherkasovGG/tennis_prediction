@@ -17,7 +17,7 @@ def register_handlers(telegram_bot, cache):
         telegram_bot.send_message(
             message.chat.id,
             "Выбери матч:",
-            reply_markup=make_matches_keyboard(),
+            reply_markup=make_matches_keyboard(cache),
         )
 
     @telegram_bot.callback_query_handler(func=lambda call: call.data.startswith("match:"))
