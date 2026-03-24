@@ -5,6 +5,96 @@ import pandas as pd
 from config import models_dir
 
 
+BEST_MIN_EDGE       = 0.02603376255747001
+BEST_KELLY_FRACTION = 0.996937068780426
+BEST_MIN_ODDS       = 1.2229944317839916
+BEST_MIN_CONF       = 0.700305905583701
+
+
+class ValueBettingStrategy:
+    def __init__(self, min_edge=0.03, kelly_fraction=0.25, min_odds=1.5, min_confidence=0.6):
+        self.min_edge = min_edge
+        self.kelly_fraction = kelly_fraction
+        self.min_odds = min_odds
+        self.min_confidence = min_confidence
+
+    def get_bookmaker_probs(self, odds_a, odds_b):
+        if pd.isna(odds_a) or pd.isna(odds_b):
+            return None, None
+        if odds_a <= 1.0 or odds_b <= 1.0:
+            return None, None
+        p_a = 1.0 / odds_a
+        p_b = 1.0 / odds_b
+        margin = p_a + p_b
+        return p_a / margin, p_b / margin
+
+    def calculate_edge(self, model_prob, bookie_prob):
+        return model_prob - bookie_prob
+
+    def calculate_kelly(self, probability, odds):
+        if odds <= 1.0 or probability <= 0 or probability >= 1.0:
+            return 0.0
+        kelly = (probability * odds - 1.0) / (odds - 1.0)
+        return max(0.0, min(1.0, kelly))
+
+    def decide(self, model_prob_a, odds_a, odds_b, bankroll=100.0):
+        bookie_prob_a, bookie_prob_b = self.get_bookmaker_probs(odds_a, odds_b)
+        if bookie_prob_a is None:
+            return {
+                'action': 'no_bet', 'stake': 0.0, 'edge': 0.0,
+                'kelly': 0.0, 'reason': 'Invalid odds'
+            }
+
+        model_prob_b = 1.0 - model_prob_a
+        edge_a = self.calculate_edge(model_prob_a, bookie_prob_a)
+        edge_b = self.calculate_edge(model_prob_b, bookie_prob_b)
+
+        edge, bet_side, odds, prob = None, None, None, None
+
+        if model_prob_a >= self.min_confidence:
+            edge = edge_a
+            bet_side = 'a'
+            odds = odds_a
+            prob = model_prob_a
+
+        if model_prob_b >= self.min_confidence:
+            if edge is None or edge_b > edge:
+                edge = edge_b
+                bet_side = 'b'
+                odds = odds_b
+                prob = model_prob_b
+
+        if bet_side is None:
+            return {
+                'action': 'no_bet', 'stake': 0.0, 'edge': 0.0,
+                'kelly': 0.0,
+                'reason': f'No side with model_prob >= {self.min_confidence:.3f}'
+            }
+
+        if edge < self.min_edge:
+            return {
+                'action': 'no_bet', 'stake': 0.0, 'edge': edge,
+                'kelly': 0.0, 'reason': f'Edge {edge:.4f} < min {self.min_edge}'
+            }
+
+        if odds < self.min_odds:
+            return {
+                'action': 'no_bet', 'stake': 0.0, 'edge': edge,
+                'kelly': 0.0, 'reason': f'Odds {odds:.3f} < min {self.min_odds}'
+            }
+
+        kelly = self.calculate_kelly(prob, odds)
+        stake = bankroll * kelly * self.kelly_fraction
+
+        return {
+            'action': f'bet_{bet_side}',
+            'stake': float(stake),
+            'edge': float(edge),
+            'kelly': float(kelly),
+            'reason': f'Edge {edge:.2%}, Kelly {kelly:.2%}, Stake {stake:.2f}'
+        }
+
+
 def load_all():
     cb_calib = joblib.load(os.path.join(models_dir, "cb_model.pkl"))
     rf_calib = joblib.load(os.path.join(models_dir, "rf_model.pkl"))
@@ -13,8 +103,8 @@ def load_all():
     dtypes   = joblib.load(os.path.join(models_dir, "train_dtypes.pkl"))
     enc      = joblib.load(os.path.join(models_dir, "rf_encoder.pkl"))
     last_test_df = pd.read_csv(os.path.join(models_dir, 'df.csv'))
-
     return cb_calib, rf_calib, meta, features, dtypes, enc, last_test_df
+
 
 def extract_player_features(row, features, prefix_player, as_player_side):
     data = {}
@@ -33,7 +123,12 @@ def extract_player_features(row, features, prefix_player, as_player_side):
     return data
 
 
-def predict_match(player_a_name, player_b_name, odds_a, odds_b):
+def predict_match(player_a_name, player_b_name, odds_a, odds_b, bankroll=100.0):
+    """
+    Возвращает:
+    - prob_a: вероятность победы A
+    - decision: dict с action/stake/edge/kelly/reason от Kelly-стратегии (лучшие параметры)
+    """
     cb_calib, rf_calib, meta, features, dtypes, enc, last_test_df = load_all()
 
     mask_a_A = last_test_df['player_a'].astype(str).str.contains(player_a_name, case=False, na=False)
@@ -104,7 +199,6 @@ def predict_match(player_a_name, player_b_name, odds_a, odds_b):
     sample['odds_avg_player_a']  = odds_a
     sample['odds_avg_player_b']  = odds_b
 
-
     def inv_prob(o):
         return 0 if o <= 1e-9 else 1.0 / o
 
@@ -165,4 +259,13 @@ def predict_match(player_a_name, player_b_name, odds_a, odds_b):
 
     prob_a = meta.predict_proba(live_meta)[:, 1][0]
     prob_a = float(np.clip(prob_a, 0.01, 0.99))
-    return prob_a
+
+    strategy = ValueBettingStrategy(
+        min_edge=BEST_MIN_EDGE,
+        kelly_fraction=BEST_KELLY_FRACTION,
+        min_odds=BEST_MIN_ODDS,
+        min_confidence=BEST_MIN_CONF,
+    )
+    decision = strategy.decide(prob_a, odds_a, odds_b, bankroll=bankroll)
+
+    return prob_a, decision
