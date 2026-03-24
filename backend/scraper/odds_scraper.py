@@ -3,7 +3,7 @@ import json
 import html
 from urllib.parse import urljoin
 from playwright.async_api import async_playwright
-from config import base_url, odds_url
+from backend.config import base_url, odds_url
 
 class OddsScraper:
     def __init__(self):

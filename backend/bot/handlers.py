@@ -1,4 +1,4 @@
-from model import predict_match
+from backend.model import predict_match
 from .keyboard import make_matches_keyboard
 
 

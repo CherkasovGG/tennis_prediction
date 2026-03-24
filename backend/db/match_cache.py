@@ -1,6 +1,6 @@
 import redis.asyncio as redis
 import json
-from config import redis_url
+from backend.config import redis_url
 
 class MatchCache:
     def __init__(self, ttl=43200):
