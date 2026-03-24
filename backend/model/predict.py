@@ -2,7 +2,7 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
-from backend.config import models_dir
+from config import models_dir
 
 
 BEST_MIN_EDGE       = 0.02603376255747001

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from backend.model import predict_match
+from model import predict_match
 
 class PredictRequest(BaseModel):
     p1: str
