@@ -22,9 +22,7 @@ def register_handlers(app, cache):
 
         matches = []
         for key, value in matches_raw.items():
-            print(key)
             p1, p2 = key
-            print(1)
             odds_a, odds_b = value
             matches.append({"p1": p1, "p2": p2, "odds_a": odds_a, "odds_b": odds_b})
         return templates.TemplateResponse(
