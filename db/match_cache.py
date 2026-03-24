@@ -8,7 +8,7 @@ class MatchCache:
         self.ttl = ttl
 
     async def start(self):
-        self.redis = await redis.from_url(redis_url, decode_responses=True)
+        self.redis = await redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=10)
 
 
     async def save_match(self, player_a: str, player_b: str, odds_a: float, odds_b: float):

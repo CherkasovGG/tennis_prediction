@@ -1,5 +1,5 @@
 python-dotenv==1.2.2
-scikit-learn==1.8.0
+scikit-learn==1.7.2
 joblib==1.5.3
 pandas==3.0.1
 numpy==2.4.3
@@ -7,3 +7,8 @@ redis==7.3.0
 playwright==1.58.0
 pyTelegramBotAPI==4.32.0
 aiohttp==3.13.3
+catboost==1.2.10
+fastapi==0.135.2
+uvicorn==0.42.0
+Jinja2==3.1.6
+python-multipart==0.0.22

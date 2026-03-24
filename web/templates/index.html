@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tennis Predictor</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f3f4f6;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px;
+            margin-top: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Tennis Predictor</h1>
+
+<div class="card">
+    <h2>Ввести вручную</h2>
+    <form method="post" action="/predict">
+        <input name="p1" placeholder="Player 1" required>
+        <input name="p2" placeholder="Player 2" required>
+        <button type="submit">Predict</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Матчи</h2>
+
+    {% for match in matches %}
+    <form method="post" action="/predict">
+        <input type="hidden" name="p1" value="{{ match.p1 }}">
+        <input type="hidden" name="p2" value="{{ match.p2 }}">
+        <button type="submit">{{ match.p1 }} vs {{ match.p2 }} ({{ match.odds_a }} / {{ match.odds_b }})</button>
+    </form>
+    {% endfor %}
+</div>
+
+{% if result %}
+<div class="card">
+    <h2>Результат</h2>
+
+    {% if result.error %}
+        <p>Ошибка: {{result.error}}</p>
+    {% else %}
+        <p>{{result.p1}} vs {{result.p2}}</p>
+        <p>P = {{result.prob}}</p>
+        <p>Odds: {{result.odds_a}} / {{result.odds_b}}</p>
+    {% endif %}
+</div>
+{% endif %}
+
+</body>
+</html>
