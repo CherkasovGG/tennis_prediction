@@ -40,8 +40,9 @@ class OddsScraper:
                 matches = await self._extract_links_from_ldjson(group_link, context)
                 for names, link in matches or []:
                     try:
+
                         async with self.semaphore:
-                            odds = await asyncio.wait_for(self._get_odds(link), timeout=15)
+                            odds = await asyncio.wait_for(self._get_odds(link, context), timeout=15)
                         if odds:
                             match_odds[names] = odds
                             print(names, odds)
