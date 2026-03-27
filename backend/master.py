@@ -8,6 +8,7 @@ from config import api_token
 from scraper import OddsScraper, OddsUpdater
 from api import register_api
 from fastapi.middleware.cors import CORSMiddleware
+import argparse
 
 async def run_api(app):
     config = uvicorn.Config(
@@ -19,12 +20,12 @@ async def run_api(app):
     server = uvicorn.Server(config)
     await server.serve()
 
-async def main():
+async def main(args):
     cache = MatchCache()
     await cache.start()
     print(f"Redis is up: {await cache.ping()}")
 
-    scraper = OddsScraper()
+    scraper = OddsScraper(odds_format="american" if args.american else "decimal")
     await scraper.start()
 
     updater = OddsUpdater(scraper, cache, update_interval=900)
@@ -59,4 +60,10 @@ async def main():
     )
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--american",
+        action="store_true"
+    )
+
+    asyncio.run(main(parser.parse_args()))
