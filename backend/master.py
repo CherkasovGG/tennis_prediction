@@ -1,5 +1,6 @@
 import asyncio
 import telebot.async_telebot as telebot
+from bot import register_handlers
 import uvicorn
 from fastapi import FastAPI
 from db import MatchCache
