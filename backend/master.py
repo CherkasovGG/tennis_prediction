@@ -39,6 +39,7 @@ async def main():
     origins = [
         "http://localhost:3000",
         "http://5.42.105.7:3000",
+        "http://72.56.234.189:3000",
         "http://localhost:5173"
     ]
 

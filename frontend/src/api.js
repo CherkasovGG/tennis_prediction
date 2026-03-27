@@ -1,4 +1,4 @@
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://5.42.105.7:8000';
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://72.56.234.189:8000';
 
 // GET /matches → [{p1, p2, odds_a, odds_b}]
 export async function fetchMatches() {
