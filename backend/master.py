@@ -1,5 +1,5 @@
 import asyncio
-# import telebot.async_telebot as telebot
+import telebot.async_telebot as telebot
 import uvicorn
 from fastapi import FastAPI
 from db import MatchCache
@@ -30,9 +30,9 @@ async def main():
     asyncio.create_task(updater.start())
     print("Updater started")
 
-    # telegram_bot = telebot.AsyncTeleBot(api_token)
-    # register_handlers(telegram_bot, cache)
-    # print("Bot started")
+    telegram_bot = telebot.AsyncTeleBot(api_token)
+    register_handlers(telegram_bot, cache)
+    print("Bot started")
 
     app = FastAPI()
     origins = [
@@ -52,7 +52,7 @@ async def main():
 
 
     await asyncio.gather(
-        # telegram_bot.infinity_polling(),
+        telegram_bot.infinity_polling(),
         run_api(app),
     )
 
