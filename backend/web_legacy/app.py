@@ -42,7 +42,7 @@ def register_handlers(app, cache):
         odds_b = odds_b or 1.8
 
         try:
-            prob = predict_match(p1, p2, odds_a, odds_b)
+            prob, decision = predict_match(p1, p2, odds_a, odds_b)
             result = {
                 "p1": p1,
                 "p2": p2,

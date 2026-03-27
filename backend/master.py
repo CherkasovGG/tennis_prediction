@@ -7,7 +7,6 @@ from config import api_token
 from scraper import OddsScraper, OddsUpdater
 from api import register_api
 from fastapi.middleware.cors import CORSMiddleware
-import aiohttp
 
 async def run_api(app):
     config = uvicorn.Config(
@@ -38,6 +37,7 @@ async def main():
     app = FastAPI()
     origins = [
         "http://localhost:3000",
+        "http://5.42.105.7:3000",
         "http://localhost:5173"
     ]
 

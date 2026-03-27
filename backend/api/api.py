@@ -14,7 +14,7 @@ def register_api(app: FastAPI, cache):
         odds_a = odds_a if odds_a is not None else 2.0
         odds_b = odds_b if odds_b is not None else 1.8
 
-        prob = predict_match(req.p1, req.p2, odds_a, odds_b)
+        prob, decision = predict_match(req.p1, req.p2, odds_a, odds_b)
 
         return {
             "p1": req.p1,
