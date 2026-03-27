@@ -78,9 +78,14 @@ function MatchCard({p1, p2, oddsA, oddsB, onClick, idx}) {
     );
 }
 
-function ResultPanel({p1, p2, probA, oddsA, oddsB, onClose}) {
+function ResultPanel({p1, p2, probA, oddsA, oddsB, decision, onClose}) {
     const ev1 = (probA * oddsA - 1) * 100;
     const ev2 = ((1 - probA) * oddsB - 1) * 100;
+    const action = decision?.action || "no_bet";
+    const stake = decision?.stake || 0;
+    const edge = decision?.edge || 0;
+    const kelly = decision?.kelly || 0;
+    const reason = decision?.reason || "";
     return (
         <div
             style={{
@@ -167,13 +172,94 @@ function ResultPanel({p1, p2, probA, oddsA, oddsB, onClose}) {
                             </div>
                             <div style={{display: "flex", justifyContent: "space-between"}}>
                                 <span style={{fontSize: 12, color: C.TEXT_MUTED}}>EV</span>
-                                <span style={{fontSize: 14, color: s.ev > 0 ? C.PRIMARY : C.SECONDARY, fontWeight: 600}}>
+                                <span
+                                    style={{fontSize: 14, color: s.ev > 0 ? C.PRIMARY : C.SECONDARY, fontWeight: 600}}>
                   {s.ev > 0 ? "+" : ""}{s.ev.toFixed(1)}%
                 </span>
                             </div>
                         </div>
                     </div>
                 ))}
+            </div>
+
+            <div style={{
+                marginTop: 20,
+                padding: "16px",
+                borderRadius: 12,
+                background: C.STAT_CARD_BG,
+                border: `1px solid ${C.STAT_CARD_BORDER}`,
+                animation: "fadeSlideIn 0.5s ease both"
+            }}>
+                <div style={{
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: 1,
+                    color: C.TEXT_SUBTITLE,
+                    marginBottom: 10,
+                    fontWeight: 600
+                }}>
+                    Рекомендация модели
+                </div>
+
+                <div style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color:
+                        action === "bet_a"
+                            ? C.PRIMARY
+                            : action === "bet_b"
+                                ? C.SECONDARY
+                                : C.TEXT_MUTED,
+                    marginBottom: 10
+                }}>
+                    {action === "no_bet" && "Не ставить"}
+                    {action === "bet_a" && `Ставить на ${p1}`}
+                    {action === "bet_b" && `Ставить на ${p2}`}
+                </div>
+
+                {action !== "no_bet" && (
+                    <div style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 13,
+                        display: "grid",
+                        gap: 6
+                    }}>
+                        <div style={{display: "flex", justifyContent: "space-between"}}>
+                            <span style={{color: C.TEXT_MUTED}}>Ставка</span>
+                            <span style={{color: C.TEXT}}>
+                    {stake.toFixed(2)}%
+                </span>
+                        </div>
+
+                        <div style={{display: "flex", justifyContent: "space-between"}}>
+                            <span style={{color: C.TEXT_MUTED}}>Edge</span>
+                            <span style={{
+                                color: edge > 0 ? C.PRIMARY : C.SECONDARY,
+                                fontWeight: 600
+                            }}>
+                    {edge > 0 ? "+" : ""}{edge.toFixed(3)}
+                </span>
+                        </div>
+
+                        <div style={{display: "flex", justifyContent: "space-between"}}>
+                            <span style={{color: C.TEXT_MUTED}}>Kelly</span>
+                            <span style={{color: C.TEXT}}>
+                    {kelly.toFixed(3)}
+                </span>
+                        </div>
+                    </div>
+                )}
+
+                {reason && (
+                    <div style={{
+                        marginTop: 10,
+                        fontSize: 12,
+                        color: C.TEXT_PLACEHOLDER,
+                        lineHeight: 1.4
+                    }}>
+                        {reason}
+                    </div>
+                )}
             </div>
 
             <div style={{
@@ -238,8 +324,8 @@ export default function App() {
         setError("");
         setLoading(true);
         predictMatch(p1, p2)
-            .then(({prob_a, odds_a, odds_b}) => {
-                setResult({p1, p2, probA: prob_a, oddsA: odds_a, oddsB: odds_b});
+            .then(({prob_a, odds_a, odds_b, decision}) => {
+                setResult({p1, p2, probA: prob_a, oddsA: odds_a, oddsB: odds_b, decision: decision});
             })
             .catch(() => setError("Ошибка при расчёте прогноза"))
             .finally(() => setLoading(false));
@@ -417,6 +503,7 @@ export default function App() {
                             probA={result.probA}
                             oddsA={result.oddsA}
                             oddsB={result.oddsB}
+                            decision={result.decision}
                             onClose={() => setResult(null)}
                         />
                     </div>

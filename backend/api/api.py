@@ -22,6 +22,7 @@ def register_api(app: FastAPI, cache):
             "prob_a": prob,
             "odds_a": odds_a,
             "odds_b": odds_b,
+            "decision": decision,
         }
 
     @app.get("/matches")
