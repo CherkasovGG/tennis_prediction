@@ -205,11 +205,9 @@ function ResultPanel({p1, p2, probA, oddsA, oddsB, decision, onClose}) {
                     fontSize: 14,
                     fontWeight: 600,
                     color:
-                        action === "bet_a"
-                            ? C.PRIMARY
-                            : action === "bet_b"
-                                ? C.SECONDARY
-                                : C.TEXT_MUTED,
+                        action === "no_bet"
+                            ? C.SECONDARY
+                            : C.PRIMARY,
                     marginBottom: 10
                 }}>
                     {action === "no_bet" && "Не ставить"}
