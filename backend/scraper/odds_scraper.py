@@ -6,9 +6,11 @@ from playwright.async_api import async_playwright
 from config import base_url, odds_url
 
 class OddsScraper:
-    def __init__(self):
+    def __init__(self, odds_format="decimal"):
         self.playwright = None
         self.browser = None
+        self.semaphore = asyncio.Semaphore(5)
+        self.odds_format = odds_format
 
     async def start(self):
         self.playwright = await async_playwright().start()
@@ -39,7 +41,9 @@ class OddsScraper:
                 matches = await self._extract_links_from_ldjson(group_link, context)
                 for names, link in matches or []:
                     try:
-                        odds = await asyncio.wait_for(self._get_odds(link, context), timeout=15)
+
+                        async with self.semaphore:
+                            odds = await asyncio.wait_for(self._get_odds(link, context), timeout=15)
                         if odds:
                             match_odds[names] = odds
                             print(names, odds)
@@ -94,6 +98,8 @@ class OddsScraper:
                         for line in lines[1:]:
                             try:
                                 num = float(line.strip())
+                                if self.odds_format == "american":
+                                    num = self._american_to_decimal(num)
                                 numbers.append(num)
                             except:
                                 continue
@@ -171,3 +177,9 @@ class OddsScraper:
             return []
         finally:
             await page.close()
+
+    def _american_to_decimal(self, odd):
+        if odd > 0:
+            return 1 + (odd / 100)
+        else:
+            return 1 + (100 / abs(odd))

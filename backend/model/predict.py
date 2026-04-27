@@ -122,6 +122,41 @@ def extract_player_features(row, features, prefix_player, as_player_side):
             data[f] = row[src_col] if src_col in row.index else 0
     return data
 
+def find_player_row(last_test_df, raw_name):
+    """
+    raw_name может быть 'Fabian Marozsan' или 'Marozsan F.'.
+    Ищем сначала по полному имени, потом по фамилии.
+    """
+    name = str(raw_name).strip()
+    mask_a = last_test_df['player_a'].astype(str).str.contains(name, case=False, na=False)
+    mask_b = last_test_df['player_b'].astype(str).str.contains(name, case=False, na=False)
+    if mask_a.any() or mask_b.any():
+        if mask_a.any():
+            return last_test_df[mask_a].iloc[-1], 'a'
+        else:
+            return last_test_df[mask_b].iloc[-1], 'b'
+
+    parts = name.replace('.', '').split()
+    if len(parts) == 2:
+        first, second = parts
+        candidates = [first, second]
+    else:
+        candidates = [name]
+
+    for cand in candidates:
+        cand = cand.strip()
+        if not cand:
+            continue
+        mask_a = last_test_df['player_a'].astype(str).str.contains(cand, case=False, na=False)
+        mask_b = last_test_df['player_b'].astype(str).str.contains(cand, case=False, na=False)
+        if mask_a.any() or mask_b.any():
+            if mask_a.any():
+                return last_test_df[mask_a].iloc[-1], 'a'
+            else:
+                return last_test_df[mask_b].iloc[-1], 'b'
+
+    return None, None
+
 
 def predict_match(player_a_name, player_b_name, odds_a, odds_b, bankroll=100.0):
     """
@@ -131,27 +166,8 @@ def predict_match(player_a_name, player_b_name, odds_a, odds_b, bankroll=100.0):
     """
     cb_calib, rf_calib, meta, features, dtypes, enc, last_test_df = load_all()
 
-    mask_a_A = last_test_df['player_a'].astype(str).str.contains(player_a_name, case=False, na=False)
-    mask_b_A = last_test_df['player_b'].astype(str).str.contains(player_a_name, case=False, na=False)
-
-    row_a_source, as_side_a = None, None
-    if mask_a_A.any():
-        row_a_source = last_test_df[mask_a_A].iloc[-1]
-        as_side_a = 'a'
-    elif mask_b_A.any():
-        row_a_source = last_test_df[mask_b_A].iloc[-1]
-        as_side_a = 'b'
-
-    mask_a_B = last_test_df['player_a'].astype(str).str.contains(player_b_name, case=False, na=False)
-    mask_b_B = last_test_df['player_b'].astype(str).str.contains(player_b_name, case=False, na=False)
-
-    row_b_source, as_side_b = None, None
-    if mask_a_B.any():
-        row_b_source = last_test_df[mask_a_B].iloc[-1]
-        as_side_b = 'a'
-    elif mask_b_B.any():
-        row_b_source = last_test_df[mask_b_B].iloc[-1]
-        as_side_b = 'b'
+    row_a_source, as_side_a = find_player_row(last_test_df, player_a_name)
+    row_b_source, as_side_b = find_player_row(last_test_df, player_b_name)
 
     sample = {}
 
